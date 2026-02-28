@@ -17,11 +17,11 @@ Claude Code hook，供 OpenClaw / NanoBot 使用。
 [claw-hook 使用规范]
 - 启动 Claude Code 时必须设置环境变量：CLAW_INITIATED_BY=<你的名字>
   例：CLAW_INITIATED_BY=nanobot claude --print "任务描述"
-- Claude 停止后读取状态文件：~/.claw-hook/status.json
+- 启动后不要轮询 Claude 进程，改为持续轮询状态文件：~/.claw-hook/status.json
+  文件由 hook 在 Claude 每次暂停时自动写入，内容变化即代表 Claude 状态发生了变化
 - status 字段含义：
     completed         → Claude 完成本轮回复，读 message 字段获取内容
     waiting_permission → Claude 被工具权限阻塞，读 tool_name/tool_input 字段
-- 不要轮询 Claude Code 进程，只读状态文件
 - 在 bot 会话内部再次调用 claude 时，命令里必须带 CLAW_INITIATED_BY=<你的名字>，
   否则会被 hook 自动阻断（防止意外递归）
 ```
@@ -65,9 +65,9 @@ CLAW_INITIATED_BY=nanobot claude --print "your task here"
 1. 写入状态文件的 `initiated_by` 字段，方便追踪调用链
 2. 激活递归调用保护——bot 会话中若 Claude 意外调用 `claude`（未显式设置 `CLAW_INITIATED_BY`），会被自动阻断
 
-### 第二步：等待状态文件更新，替代轮询
+### 第二步：持续轮询状态文件，替代轮询 Claude 进程
 
-Claude 停止后，`~/.claw-hook/status.json` 会被自动更新。读取该文件即可感知状态：
+启动 Claude 后，不要关注 Claude 进程本身是否在运行。改为持续轮询 `~/.claw-hook/status.json`——每当 Claude 暂停（无论任何原因），hook 都会自动更新该文件。文件内容发生变化时，读取并处理：
 
 ```python
 import json, os
