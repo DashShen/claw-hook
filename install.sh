@@ -2,7 +2,7 @@
 # install.sh — Install claw-hooks into the current user's Claude Code setup.
 #
 # What this script does:
-#   1. Copies hooks/status_writer.py to ~/.claw-hooks/hooks/
+#   1. Copies hook/status_writer.py to ~/.claw-hooks/hook/
 #   2. Merges hook configuration into ~/.claude/settings.json
 #
 # Usage:
@@ -13,12 +13,12 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="${HOME}/.claw-hooks"
-HOOK_SCRIPT="${INSTALL_DIR}/hooks/status_writer.py"
+HOOK_SCRIPT="${INSTALL_DIR}/hook/status_writer.py"
 
 # ── 1. Install hook script ────────────────────────────────────────────────────
 
-mkdir -p "${INSTALL_DIR}/hooks"
-cp "${REPO_DIR}/hooks/status_writer.py" "${HOOK_SCRIPT}"
+mkdir -p "${INSTALL_DIR}/hook"
+cp "${REPO_DIR}/hook/status_writer.py" "${HOOK_SCRIPT}"
 chmod +x "${HOOK_SCRIPT}"
 echo "✓ Installed hook script → ${HOOK_SCRIPT}"
 

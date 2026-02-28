@@ -116,7 +116,19 @@ def handle_permission_request(data: dict) -> None:
 
 
 def handle_pre_tool_use(data: dict) -> None:
-    """Block recursive claude invocations when running inside a bot session."""
+    """Block accidental recursive claude invocations in bot-initiated sessions.
+
+    Intentional orchestration calls are distinguished by the presence of an
+    explicit CLAW_INITIATED_BY=<value> assignment in the command string.
+    Accidental recursive calls (where Claude blindly re-invokes itself) will
+    not include this marker and are blocked.
+
+    Allowed (intentional orchestration):
+        CLAW_INITIATED_BY=nanobot claude --print "task"
+
+    Blocked (accidental recursion):
+        claude --print "task"
+    """
     if INITIATED_BY == "human":
         return
 
@@ -125,23 +137,31 @@ def handle_pre_tool_use(data: dict) -> None:
         return
 
     command = (data.get("tool_input") or {}).get("command", "")
-    if CLAUDE_INVOKE_RE.search(command):
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": (
-                            f"Recursive claude invocation blocked: "
-                            f"session was initiated by '{INITIATED_BY}'. "
-                            "Invoking claude from within a bot-initiated session "
-                            "would create an infinite loop."
-                        ),
-                    }
+    if not CLAUDE_INVOKE_RE.search(command):
+        return
+
+    # Intentional orchestration: the command explicitly sets CLAW_INITIATED_BY.
+    # This signals a deliberate, controlled sub-invocation — allow it through.
+    if "CLAW_INITIATED_BY=" in command:
+        return
+
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"Accidental recursive claude invocation blocked: "
+                        f"session was initiated by '{INITIATED_BY}' and the "
+                        "command does not set CLAW_INITIATED_BY. "
+                        "To make an intentional sub-invocation, include "
+                        "CLAW_INITIATED_BY=<caller> in the command."
+                    ),
                 }
-            )
+            }
         )
+    )
 
 
 def main() -> None:
