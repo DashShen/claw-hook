@@ -22,6 +22,11 @@ cp "${REPO_DIR}/hook/status_writer.py" "${HOOK_SCRIPT}"
 chmod +x "${HOOK_SCRIPT}"
 echo "✓ Installed hook script → ${HOOK_SCRIPT}"
 
+WAIT_SCRIPT="${INSTALL_DIR}/hook/wait_status.sh"
+cp "${REPO_DIR}/hook/wait_status.sh" "${WAIT_SCRIPT}"
+chmod +x "${WAIT_SCRIPT}"
+echo "✓ Installed wait script  → ${WAIT_SCRIPT}"
+
 # ── 2. Merge hook configuration into ~/.claude/settings.json ─────────────────
 
 if ! command -v python3 &>/dev/null; then

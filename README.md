@@ -20,34 +20,41 @@ Claude Code hook，供 OpenClaw / NanoBot 使用。
   安装命令：git clone <repo> && cd claw-hook && bash install.sh
 
 【启动 Claude】
-- 必须在后台启动，并设置身份标记：
+必须在后台启动，并设置身份标记：
   nohup bash -c 'CLAW_INITIATED_BY=nanobot claude --print "任务描述"' > /tmp/claude.log 2>&1 &
-- 不要用前台同步方式启动（会阻塞自身进程）
+不要用前台同步方式启动（会阻塞自身进程）。
 
-【等待结果】
-- 启动后，持续轮询状态文件：~/.claw-hook/status.json
-- 用文件修改时间（mtime）判断是否有新状态，不要用 sleep 固定等待
-- 不要用 ps/grep 检查 claude 进程是否存活
-- 不要读 claude 的日志文件来判断状态
-- 正确的轮询方式（每秒检查一次 mtime）：
-    import os, time, json
-    status_file = os.path.expanduser("~/.claw-hook/status.json")
-    last_mtime = os.path.getmtime(status_file) if os.path.exists(status_file) else 0
-    while True:
-        time.sleep(1)
-        mtime = os.path.getmtime(status_file) if os.path.exists(status_file) else 0
-        if mtime != last_mtime:
-            status = json.load(open(status_file))
-            handle(status)
-            break
+【等待结果 - 必须用 wait_status.sh，禁止其他方式】
+安装后 ~/.claw-hook/hook/wait_status.sh 可用，用法如下：
+
+  # 第一次调用，传入 0
+  result=$(bash ~/.claw-hook/hook/wait_status.sh 0)
+
+  # 判断结果
+  if echo "$result" | grep -q "^CHANGED"; then
+      # 文件已更新，result 第二行起是 status.json 内容
+      status_json=$(echo "$result" | tail -n +2)
+  else
+      # 超时未变化，result 第二行是当前 mtime，传给下次调用
+      mtime=$(echo "$result" | tail -n 1)
+      result=$(bash ~/.claw-hook/hook/wait_status.sh "$mtime")
+      # 重复直到收到 CHANGED
+  fi
+
+严格禁止的行为：
+- 禁止 ps aux | grep claude 检查进程
+- 禁止 sleep N && cat status.json 固定等待
+- 禁止直接读取 ~/.claude/projects/.../*.jsonl transcript 文件
+- 禁止因状态文件不存在就放弃，转而自己完成任务
+- 超过 10 分钟（约 20 次 wait_status.sh 调用）仍未收到 CHANGED，才可判定异常并上报
 
 【状态处理】
-- status = "completed"          → Claude 完成本轮回复，读 message 字段
-- status = "waiting_permission" → Claude 被工具权限阻塞，读 tool_name/tool_input
+status = "completed"          → Claude 完成本轮回复，读 message 字段
+status = "waiting_permission" → Claude 被工具权限阻塞，读 tool_name/tool_input
 
 【bot 内部再次调用 claude】
-- 命令里必须带 CLAW_INITIATED_BY=<你的名字>，否则被 hook 自动阻断
-  正确：CLAW_INITIATED_BY=nanobot claude --print "子任务"
+命令里必须显式带 CLAW_INITIATED_BY=nanobot，否则被 hook 自动阻断：
+  正确：nohup bash -c 'CLAW_INITIATED_BY=nanobot claude --print "子任务"' > /tmp/sub.log 2>&1 &
   错误：claude --print "子任务"   ← 会被阻断
 ```
 
@@ -102,45 +109,57 @@ nohup bash -c 'CLAW_INITIATED_BY=openclaw claude --print "your task here"' \
 1. 写入状态文件的 `initiated_by` 字段，方便追踪调用链
 2. 激活递归调用保护——bot 会话中若 Claude 意外调用 `claude`（未显式设置该变量），会被自动阻断
 
-### 第二步：用 mtime 轮询状态文件，不要轮询 Claude 进程
+### 第二步：用 wait_status.sh 等待状态变化
 
-启动后，**不要**：
-- 用 `ps aux | grep claude` 检查进程是否在运行
-- 用 `sleep N && cat status.json` 固定等待
-- 读 claude 的日志文件来判断任务状态
+安装完成后，`~/.claw-hook/hook/wait_status.sh` 会随之安装。它每次最多等待 30 秒，超时后返回 `WAITING` 和当前 mtime，供下次调用传入。NanoBot 循环调用直到收到 `CHANGED`。
 
-**正确做法**：每秒检查一次状态文件的修改时间（mtime），文件更新时立即读取处理：
+**不要**：
+- 用 `ps aux | grep claude` 检查 Claude 进程
+- 用 `sleep N && cat status.json` 固定等待后读取
+- 直接读取 `~/.claude/projects/.../**.jsonl` transcript 文件
+- 状态文件不存在就放弃，转而自己完成任务
+
+**正确做法**：
+
+```bash
+# 第一次调用传入 0
+result=$(bash ~/.claw-hook/hook/wait_status.sh 0)
+
+# 循环直到收到 CHANGED（每次最多等 30 秒，超时传入新 mtime 继续等）
+while echo "$result" | grep -q "^WAITING"; do
+    mtime=$(echo "$result" | tail -n 1)
+    result=$(bash ~/.claw-hook/hook/wait_status.sh "$mtime")
+done
+
+# 收到 CHANGED，读取状态
+status_json=$(echo "$result" | tail -n +2)
+echo "$status_json"
+```
+
+或在 Python 中调用：
 
 ```python
-import os, time, json
+import subprocess, json
 
-status_file = os.path.expanduser("~/.claw-hook/status.json")
+def wait_for_claude(max_rounds=20):
+    """每轮最多等 30 秒，共最多等 10 分钟"""
+    mtime = "0"
+    for _ in range(max_rounds):
+        result = subprocess.check_output(
+            ["bash", f"{os.path.expanduser('~')}/.claw-hook/hook/wait_status.sh", mtime],
+            text=True
+        )
+        lines = result.strip().splitlines()
+        if lines[0] == "CHANGED":
+            return json.loads("\n".join(lines[1:]))
+        mtime = lines[1]  # WAITING，取新 mtime 继续等
+    raise TimeoutError("Claude 超过 10 分钟未响应")
 
-# 记录启动前的 mtime，避免读到上一次任务的残留状态
-last_mtime = os.path.getmtime(status_file) if os.path.exists(status_file) else 0
-
-while True:
-    time.sleep(1)
-    if not os.path.exists(status_file):
-        continue
-    mtime = os.path.getmtime(status_file)
-    if mtime == last_mtime:
-        continue  # 文件未变化，继续等待
-
-    # 文件有更新，读取状态
-    with open(status_file) as f:
-        status = json.load(f)
-
-    if status["status"] == "completed":
-        # Claude 完成本轮回复，message 字段包含最后一条回复摘要
-        handle_completion(status["message"])
-        break
-
-    elif status["status"] == "waiting_permission":
-        # Claude 被工具权限请求阻塞
-        # tool_name / tool_input 字段包含具体工具调用信息
-        handle_permission(status["tool_name"], status["tool_input"])
-        break
+status = wait_for_claude()
+if status["status"] == "completed":
+    handle_completion(status["message"])
+elif status["status"] == "waiting_permission":
+    handle_permission(status["tool_name"], status["tool_input"])
 ```
 
 ### bot 会话内部再次调用 claude
@@ -257,11 +276,13 @@ NanoBot
   │       nohup bash -c 'CLAW_INITIATED_BY=nanobot claude --print "修复 TypeScript 错误"' \
   │         > /tmp/claude.log 2>&1 &
   │
-  ├─2─ 用 mtime 轮询状态文件，不检查 claude 进程
-  │       每秒检查 ~/.claw-hook/status.json 的 mtime
-  │       文件未变化 → 继续等待，零 token 消耗
+  ├─2─ 循环调用 wait_status.sh，不检查 claude 进程
+  │       bash ~/.claw-hook/hook/wait_status.sh <mtime>
+  │       返回 WAITING → 取新 mtime，继续调用
+  │       返回 CHANGED → 读取状态内容
   │       ✗ 不要用 sleep N && cat status.json
   │       ✗ 不要用 ps aux | grep claude
+  │       ✗ 不要读 transcript .jsonl 文件
   │
   │   ══════ Claude Code 在执行任务 ══════
   │
