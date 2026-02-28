@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# install.sh — Install claw-hooks into the current user's Claude Code setup.
+# install.sh — Install claw-hook into the current user's Claude Code setup.
 #
 # What this script does:
-#   1. Copies hook/status_writer.py to ~/.claw-hooks/hook/
+#   1. Copies hook/status_writer.py to ~/.claw-hook/hook/
 #   2. Merges hook configuration into ~/.claude/settings.json
 #
 # Usage:
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${HOME}/.claw-hooks"
+INSTALL_DIR="${HOME}/.claw-hook"
 HOOK_SCRIPT="${INSTALL_DIR}/hook/status_writer.py"
 
 # ── 1. Install hook script ────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ PYEOF
 echo ""
 echo "Installation complete."
 echo ""
-echo "Status file will be written to: ${CLAW_STATUS_FILE:-${HOME}/.claw-hooks/status.json}"
+echo "Status file will be written to: ${CLAW_STATUS_FILE:-${HOME}/.claw-hook/status.json}"
 echo ""
 echo "To tell the hook that a session was started by OpenClaw, set:"
 echo "  CLAW_INITIATED_BY=openclaw claude --print 'your task'"

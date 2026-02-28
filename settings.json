@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claw-hooks/hook/status_writer.py",
+            "command": "python3 ~/.claw-hook/hook/status_writer.py",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claw-hooks/hook/status_writer.py",
+            "command": "python3 ~/.claw-hook/hook/status_writer.py",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claw-hooks/hook/status_writer.py",
+            "command": "python3 ~/.claw-hook/hook/status_writer.py",
             "timeout": 5
           }
         ]

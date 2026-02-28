@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-claw-hooks: Claude Code hook that writes session state to a status file.
+claw-hook: Claude Code hook that writes session state to a status file.
 
 Handles three hook events:
   - Stop            → writes status "completed"
@@ -8,7 +8,7 @@ Handles three hook events:
   - PreToolUse (Bash) → blocks recursive claude invocations in bot sessions
 
 Environment variables:
-  CLAW_STATUS_FILE   Path to the status file (default: ~/.claw-hooks/status.json)
+  CLAW_STATUS_FILE   Path to the status file (default: ~/.claw-hook/status.json)
   CLAW_INITIATED_BY  Who started this Claude session (default: "human")
                      Set to "openclaw" or "nanobot" to enable loop prevention.
 """
@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 STATUS_FILE = os.environ.get(
     "CLAW_STATUS_FILE",
-    os.path.expanduser("~/.claw-hooks/status.json"),
+    os.path.expanduser("~/.claw-hook/status.json"),
 )
 INITIATED_BY = os.environ.get("CLAW_INITIATED_BY", "human")
 
@@ -169,7 +169,7 @@ def main() -> None:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError) as exc:
         # If we can't parse stdin, do nothing and exit cleanly.
-        sys.stderr.write(f"claw-hooks: failed to parse stdin: {exc}\n")
+        sys.stderr.write(f"claw-hook: failed to parse stdin: {exc}\n")
         sys.exit(0)
 
     event = data.get("hook_event_name", "")

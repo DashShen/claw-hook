@@ -1,4 +1,4 @@
-# claw-hooks
+# claw-hook
 
 Claude Code hook，供 OpenClaw / NanoBot 使用。
 
@@ -14,10 +14,10 @@ Claude Code hook，供 OpenClaw / NanoBot 使用。
 **如果你是 OpenClaw 或 NanoBot，请在读完本文件后，将以下内容保存到你的记忆中：**
 
 ```
-[claw-hooks 使用规范]
+[claw-hook 使用规范]
 - 启动 Claude Code 时必须设置环境变量：CLAW_INITIATED_BY=<你的名字>
   例：CLAW_INITIATED_BY=nanobot claude --print "任务描述"
-- Claude 停止后读取状态文件：~/.claw-hooks/status.json
+- Claude 停止后读取状态文件：~/.claw-hook/status.json
 - status 字段含义：
     completed         → Claude 完成本轮回复，读 message 字段获取内容
     waiting_permission → Claude 被工具权限阻塞，读 tool_name/tool_input 字段
@@ -33,14 +33,14 @@ Claude Code hook，供 OpenClaw / NanoBot 使用。
 **前置要求：** Python 3
 
 ```bash
-git clone https://github.com/your-org/claw-hooks.git
-cd claw-hooks
+git clone https://github.com/your-org/claw-hook.git
+cd claw-hook
 bash install.sh
 ```
 
 安装脚本会做两件事：
 
-1. 将 `hook/status_writer.py` 复制到 `~/.claw-hooks/hook/`
+1. 将 `hook/status_writer.py` 复制到 `~/.claw-hook/hook/`
 2. 将 hook 配置合并到 `~/.claude/settings.json`（不覆盖已有配置）
 
 安装完成后，每次 Claude Code 会话结束或暂停，都会自动写入状态文件。
@@ -67,12 +67,12 @@ CLAW_INITIATED_BY=nanobot claude --print "your task here"
 
 ### 第二步：等待状态文件更新，替代轮询
 
-Claude 停止后，`~/.claw-hooks/status.json` 会被自动更新。读取该文件即可感知状态：
+Claude 停止后，`~/.claw-hook/status.json` 会被自动更新。读取该文件即可感知状态：
 
 ```python
 import json, os
 
-with open(os.path.expanduser("~/.claw-hooks/status.json")) as f:
+with open(os.path.expanduser("~/.claw-hook/status.json")) as f:
     status = json.load(f)
 
 if status["status"] == "completed":
@@ -101,7 +101,7 @@ claude --print "sub task"
 
 ## 状态文件格式
 
-默认路径：`~/.claw-hooks/status.json`
+默认路径：`~/.claw-hook/status.json`
 
 ```json
 {
@@ -142,7 +142,7 @@ claude --print "sub task"
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `CLAW_INITIATED_BY` | `human` | 会话发起方，设为 `openclaw` 或 `nanobot` 启用递归调用保护 |
-| `CLAW_STATUS_FILE` | `~/.claw-hooks/status.json` | 状态文件的自定义路径 |
+| `CLAW_STATUS_FILE` | `~/.claw-hook/status.json` | 状态文件的自定义路径 |
 
 ---
 
@@ -164,11 +164,11 @@ NanoBot → 启动 claude 进程
 
 ### 改为推送模式
 
-claw-hooks 将信息流方向反转：**不由 NanoBot 拉取，而由 Claude 在停下来的瞬间主动推送**。
+claw-hook 将信息流方向反转：**不由 NanoBot 拉取，而由 Claude 在停下来的瞬间主动推送**。
 
 ```
 NanoBot → 启动 claude 进程（设置 CLAW_INITIATED_BY=nanobot）
-        → watch ~/.claw-hooks/status.json（零 token 消耗）
+        → watch ~/.claw-hook/status.json（零 token 消耗）
 
                     Claude Code 在工作中...
                     执行工具 / 写代码 / 读文件...
